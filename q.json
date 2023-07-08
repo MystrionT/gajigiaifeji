@@ -1,0 +1,208 @@
+package ClassPackage;
+ 
+import javazoom.jl.decoder.JavaLayerException;
+ 
+import javax.swing.*;
+import java.awt.*;
+import java.awt.event.KeyEvent;
+import java.awt.event.KeyListener;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.io.FileNotFoundException;
+import java.util.ArrayList;
+import java.util.List;
+ 
+// KeyListener接口 键盘事件类
+public class MyFrame extends JFrame implements KeyListener, Runnable {
+    // 用于存储所有背景
+    private List<BackGround> allBg = new ArrayList<>();
+    //用于存储当前的背景
+    private BackGround nowBg = new BackGround();
+    //用于双缓存
+    private Image offScreenImage = null;
+    //马里奥对象
+    private Mario mario = new Mario();
+    //定义一个线程对象用于实现马里奥的运动
+    private Thread thread = new Thread(this);
+ 
+    public static final int START = 0;
+    public static final int RUNNING = 1;
+    private int state = START;
+ 
+    public MyFrame() {
+        //设置窗口的大小
+        this.setSize(800, 600);
+        // 设置窗口居中显示
+        this.setLocationRelativeTo(null);
+        //设置窗口可见
+        this.setVisible(true);
+        //设置点击窗口关闭见关闭程序
+        this.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        //设置窗口大小不可变
+        this.setResizable(false);
+        //向键盘添加键盘监听器  KeyListener接口
+        this.addKeyListener(this);
+        //设置窗口名称
+        this.setTitle("超级玛丽");
+        // 初始化图片
+        StaticValue.init();
+        //初始化马里奥对象
+        mario = new Mario(10, 355);
+        //创建全部场景
+        for (int i = 1; i <= 3; i++) {
+            allBg.add(new BackGround(i, i == 3 ? true : false));
+        }
+        // 将第一个场景设置为当前场景
+        nowBg = allBg.get(0);
+        mario.setBackGround(nowBg);
+        //调用鼠标点击方法
+        action();
+        //若游戏未开始 无限 停止线程
+        while (state == START) {
+            Thread.yield();
+        }
+        //绘制图像
+        repaint();
+        thread.start();
+        //加入音乐
+        try {
+            Music m1 = new Music(1);
+        } catch (FileNotFoundException | JavaLayerException | InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+ 
+    private void action() {
+        //鼠标侦听器
+        MouseAdapter m = new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                //鼠标点击时若为游戏未开始状态则开始游戏
+                if (state == START) {
+                    state = RUNNING;
+                }
+            }
+        };
+        this.addMouseListener(m);
+        this.addMouseMotionListener(m);
+    }
+ 
+    public void paint(Graphics g) {
+        //窗口
+        if (offScreenImage == null) {
+            offScreenImage = createImage(800, 600);
+        }
+        //画笔
+        Graphics graphics = offScreenImage.getGraphics();
+        //画窗口
+        graphics.fillRect(0, 0, 800, 600);
+        //画背景
+        graphics.drawImage(nowBg.getBgImage(), 0, 0, this);
+        //绘制敌人
+        for (Enemy o : nowBg.getEnemyList()) {
+            graphics.drawImage(o.getShow(), o.getX(), o.getY(), this);
+        }
+        //绘制障碍物
+        //画障碍物
+        for (Obstacle ob : nowBg.getObstacleList()) {
+            graphics.drawImage(ob.getShow(), ob.getX(), ob.getY(), this);
+        }
+        //画城堡 旗杆
+        graphics.drawImage(nowBg.getTower(), 620, 270, this);
+        graphics.drawImage(nowBg.getGan(), 500, 220, this);
+        //绘制马里奥
+        graphics.drawImage(mario.getShow(), mario.getX(), mario.getY(), this);
+        // 添加分数
+        Color c = graphics.getColor();
+        graphics.setColor(Color.GRAY);
+        graphics.setFont(new Font("楷体", Font.BOLD, 18));
+        graphics.drawString("当前分数:" + mario.getScore(), 16, 100);
+        graphics.drawString("当前金币:" + mario.getGold(), 16, 123);
+        graphics.setColor(c);
+        //如果游戏未开始 画封面覆盖游戏画面
+        if (state == START) {
+            graphics.drawImage(BackGround.getStart(), 0, 0, this);
+        }
+        // 将图像绘制到窗口中
+        g.drawImage(offScreenImage, 0, 0, this);
+ 
+    }
+ 
+    public static void main(String[] args) {
+        MyFrame myFrame = new MyFrame();
+    }
+ 
+    @Override
+    public void keyTyped(KeyEvent e) {
+ 
+    }
+ 
+    //当键盘按下时调用
+    @Override
+    public void keyPressed(KeyEvent e) {
+        //向右移动
+        if (e.getKeyCode() == 39) {
+            mario.rightMove();
+        }
+        //向左移动
+        if (e.getKeyCode() == 37) {
+            mario.leftMove();
+        }
+        //跳跃
+        if (e.getKeyCode() == 38) {
+            mario.jump();
+        }
+    }
+ 
+    //当键盘松开时
+    @Override
+    public void keyReleased(KeyEvent e) {
+        //向左停止
+        if (e.getKeyCode() == 37) {
+            mario.leftStop();
+        }
+        //向右停止
+        if (e.getKeyCode() == 39) {
+            mario.rightStop();
+        }
+    }
+ 
+    @Override
+    public void run() {
+        System.out.println(this.getName());
+        while (true) {
+            //调用鼠标点击方法
+            action();
+            //若游戏未开始 无限 停止线程
+            while (state == START) {
+                Thread.yield();
+            }
+            //如果马里奥达到了屏幕的最右  那么切换场景
+            repaint();
+            try {
+                Thread.sleep(50);
+                if (mario.getX() >= 775) {
+                    nowBg = allBg.get(nowBg.getSort());
+                    mario.setBackGround(nowBg);
+                    mario.setX(10);
+                    mario.setY(355);
+                }
+                //判断马里奥是否死亡
+                if (mario.isDeath()) {
+                    //弹窗
+                    JOptionPane.showMessageDialog(this, "马里奥死亡!!!");
+                    System.exit(0);
+                }
+                // 判断游戏是否结束
+                if (mario.isOK()) {
+                    JOptionPane.showMessageDialog(this, "恭喜你！成功通关了");
+                    System.exit(0);
+                }
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+ 
+        }
+ 
+    }
+}
